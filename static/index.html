@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Go IoT Dashboard</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #1e1e1e;
+            color: white;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .chart-container {
+            width: 45%;
+            margin: 20px;
+            background: #2b2b2b;
+            padding: 15px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="charts"></div>
+
+    <script>
+        const charts = {}; // Здесь храним объекты графиков по топикам
+
+        function createChart(topic) {
+            const div = document.createElement('div');
+            div.className = 'chart-container';
+            div.innerHTML = `<h3>Sensor: ${topic}</h3><div id="chart-${topic}"></div>`;
+            document.getElementById('charts').appendChild(div);
+
+            const options = {
+                chart: { type: 'line', height: 300, animations: { enabled: true, dynamicAnimation: { speed: 500 } } },
+                series: [{ name: topic, data: [] }],
+                xaxis: { type: 'datetime' },
+                theme: { mode: 'dark' }
+            };
+            const chart = new ApexCharts(div.querySelector(`#chart-${topic}`), options);
+            chart.render();
+            return chart;
+        }
+
+        const socket = new WebSocket("ws://" + location.host + "/ws");
+        socket.onmessage = function (event) {
+            const msg = JSON.parse(event.data);
+            if (!charts[msg.topic]) charts[msg.topic] = createChart(msg.topic);
+
+            const x = new Date().getTime();
+            const y = parseFloat(msg.value);
+
+            charts[msg.topic].appendData([{ data: [[x, y]] }]);
+        };
+
+        socket.onmessage = function (event) {
+            const msg = JSON.parse(event.data);
+            if (!charts[msg.topic]) charts[msg.topic] = createChart(msg.topic);
+
+            // Если есть время из базы - используем его, иначе текущее
+            const x = msg.time ? new Date(msg.time).getTime() : new Date().getTime();
+            const y = parseFloat(msg.value);
+
+            // Если это история, лучше использовать метод для пачки данных, 
+            // но для простоты оставим appendData или добавим условие
+            charts[msg.topic].appendData([{ data: [[x, y]] }]);
+        };
+    </script>
+</body>
+
+</html>
