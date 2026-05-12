@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"strconv"
 
+	"iot-project/intrernal/broker"
+	"iot-project/intrernal/database"
 	"iot-project/models"
-	"iot-project/pkg/database"
 
 	"github.com/gorilla/websocket"
 
+	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
 )
 
@@ -18,22 +20,35 @@ func main() {
 	hub := &Hub{clients: make(map[*websocket.Conn]bool), db: db}
 
 	// Инициализация MQTT (используем ваш прошлый код broker.go)
-	mqttServer := setupBroker()
+	mqttServer := broker.SetupBroker()
 
-	mqttServer.Events.OnMessage = func(cl *server.Client, pk packets.Packet) {
-		val, _ := strconv.ParseFloat(string(pk.Payload), 64)
+	callbackFn := func(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
+		val, err := strconv.ParseFloat(string(pk.Payload), 64)
+		if err != nil {
+			mqttServer.Log.Error("Failed to parse payload", "error", err, "topic", pk.TopicName)
+			return
+		}
 
-		// Создаем объект модели
+		// Create model object
 		reading := models.SensorReading{
 			Topic: pk.TopicName,
 			Value: val,
 		}
 
-		// Сохраняем через GORM (одной строкой!)
-		db.Create(&reading)
+		// Save via GORM
+		if err := db.Create(&reading).Error; err != nil {
+			mqttServer.Log.Error("Failed to save reading", "error", err)
+			return
+		}
 
-		// Транслируем в браузер
+		// Broadcast to browser
 		hub.Broadcast(reading)
+	}
+
+	// Subscribe to all topics (or specific ones)
+	err := mqttServer.Subscribe("#", 1, callbackFn)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	go mqttServer.Serve()
