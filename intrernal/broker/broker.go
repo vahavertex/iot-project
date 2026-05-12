@@ -11,7 +11,9 @@ import (
 )
 
 func SetupBroker() *mqtt.Server {
-	s := mqtt.New(nil)
+	s := mqtt.New(&mqtt.Options{
+		InlineClient: true, // Добавьте эту строку
+	})
 	_ = s.AddHook(new(auth.AllowHook), nil)
 
 	tcp := listeners.NewTCP(listeners.Config{

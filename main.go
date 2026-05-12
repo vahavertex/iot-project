@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"iot-project/intrernal/broker"
 	"iot-project/intrernal/database"
@@ -23,6 +24,11 @@ func main() {
 	mqttServer := broker.SetupBroker()
 
 	callbackFn := func(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
+		// Игнорируем системные топики брокера
+		if strings.HasPrefix(pk.TopicName, "$SYS") {
+			return
+		}
+
 		val, err := strconv.ParseFloat(string(pk.Payload), 64)
 		if err != nil {
 			mqttServer.Log.Error("Failed to parse payload", "error", err, "topic", pk.TopicName)
