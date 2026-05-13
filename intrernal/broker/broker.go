@@ -20,6 +20,7 @@ func SetupBroker() *mqtt.Server {
 		Type:    listeners.TypeMock,
 		Address: "0.0.0.0:1883",
 	})
+
 	if err := s.AddListener(tcp); err != nil {
 		log.Fatal(err)
 	}
